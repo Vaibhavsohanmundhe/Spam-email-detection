@@ -1,0 +1,107 @@
+# spam_detector.py - Email Spam Detection using Machine Learning
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+import joblib
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import re
+
+# Download NLTK data
+nltk.download('stopwords', quiet=True)
+nltk.download('word_tokenize', quiet=True)
+
+def preprocess_text(text):
+    """Clean and preprocess email text"""
+    text = text.lower()  # Convert to lowercase
+    text = re.sub(r'[^a-zA-Zs]', '', text)  # Remove special chars
+    tokens = word_tokenize(text)  # Tokenize
+    stop_words = set(stopwords.words('english'))  # Remove stopwords
+    tokens = [word for word in tokens if word not in stop_words and len(word) > 2]
+    return ' '.join(tokens)
+
+def train_spam_detector(dataset_path='spam.csv'):
+    """Train the spam detection model"""
+    
+    # Load your dataset (replace with your actual email dataset)
+    # Common dataset: SMS Spam Collection from Kaggle
+    df = pd.read_csv(dataset_path, encoding='latin-1')
+    df = df.drop(['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], axis=1)
+    df = df.rename(columns={'v1': 'label', 'v2': 'text'})
+    
+    print(f"Dataset: {len(df)} emails")
+    print(f"Spam: {len(df[df['label']=='spam'])}, Ham: {len(df[df['label']=='ham'])}")
+    
+    # Preprocess
+    df['text_cleaned'] = df['text'].apply(preprocess_text)
+    
+    # Feature extraction
+    vectorizer = CountVectorizer(max_features=5000)
+    X = vectorizer.fit_transform(df['text_cleaned'])
+    y = df['label']
+    
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    
+    # Train model
+    classifier = MultinomialNB()
+    classifier.fit(X_train, y_train)
+    
+    # Evaluate
+    y_pred = classifier.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"
+Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)")
+    print("
+Classification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    # Save model
+    joblib.dump(classifier, 'email_spam_model.pkl')
+    joblib.dump(vectorizer, 'vectorizer.pkl')
+    print("
+✓ Model saved as 'email_spam_model.pkl'")
+    
+    return classifier, vectorizer
+
+def predict_spam(email_text, classifier=None, vectorizer=None):
+    """Predict if an email is spam"""
+    if classifier is None or vectorizer is None:
+        classifier = joblib.load('email_spam_model.pkl')
+        vectorizer = joblib.load('vectorizer.pkl')
+    
+    cleaned = preprocess_text(email_text)
+    vectorized = vectorizer.transform([cleaned])
+    prediction = classifier.predict(vectorized)[0]
+    
+    return prediction == 'spam'
+
+# === USAGE EXAMPLES ===
+
+if __name__ == "__main__":
+    # Train the model (run once)
+    classifier, vectorizer = train_spam_detector()
+    
+    # Test predictions
+    test_emails = [
+        "Congratulations! You won $1000. Click now to claim!",
+        "Hi, can we meet tomorrow at 3pm for the project?",
+        "FREE MONEY! Urgent! Click this link before expires!",
+        "The report is attached. Please review before Friday."
+    ]
+    
+    print("
+" + "="*50)
+    print("PREDICTIONS:")
+    for email in test_emails:
+        is_spam = predict_spam(email, classifier, vectorizer)
+        print(f"
+{'⚠️ SPAM' if is_spam else '✓ OK'}: {email}")
