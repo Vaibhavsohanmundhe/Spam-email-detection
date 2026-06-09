@@ -1,0 +1,142 @@
+# Email Spam Detection using Machine Learning
+# Run this program on your device
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+import joblib
+import re
+
+def preprocess_text(text):
+    """Clean and preprocess email text"""
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Zs]', '', text)
+    tokens = text.split()
+    tokens = [word for word in tokens if len(word) > 2]
+    return ' '.join(tokens)
+
+def create_sample_dataset():
+    """Create a sample dataset for demonstration"""
+    sample_data = {
+        'label': ['spam', 'spam', 'spam', 'ham', 'ham', 'ham', 'spam', 'ham', 'spam', 'ham',
+                  'spam', 'ham', 'spam', 'ham', 'spam', 'ham', 'spam', 'ham', 'spam', 'ham'],
+        'text': [
+            'Congratulations You won a prize Claim now click link',
+            'Free money guaranteed Click here now urgent',
+            'You selected winner claim prize money fast',
+            'Hey can we meet tomorrow for the project meeting',
+            'Hi the report is ready please check your email',
+            'Meeting scheduled at pm today in the main office',
+            'URGENT Your account will be deleted click now verify',
+            'The document you requested is attached to this email',
+            'Buy now percent discount limited offer click',
+            'Thanks for your order it will arrive Wednesday',
+            'WINNER Get free phone click link now urgent money',
+            'Please review the attached file before Friday meeting',
+            'Act now special offer expires today click buy',
+            'Can you send me the updated spreadsheet please',
+            'FREE entry win big prize click link now money',
+            'Hello the conference call is at am tomorrow',
+            'Click here claim your prize money now free',
+            'The invoice is due next week please pay soon',
+            'Limited time offer buy now get free shipping deal',
+            'The meeting notes are in the shared folder'
+        ]
+    }
+    return pd.DataFrame(sample_data)
+
+def train_spam_detector():
+    """Train the spam detection model"""
+    
+    print("=" * 60)
+    print("EMAIL SPAM DETECTION USING MACHINE LEARNING")
+    print("=" * 60)
+    print()
+    
+    print("Using sample dataset for demonstration...")
+    df = create_sample_dataset()
+    
+    print(f"Dataset loaded with {len(df)} emails")
+    print(f"Spam count: {len(df[df['label'] == 'spam'])}")
+    print(f"Ham count: {len(df[df['label'] == 'ham'])}")
+    print()
+    
+    print("Preprocessing text data...")
+    df['text_cleaned'] = df['text'].apply(preprocess_text)
+    
+    print("Creating text features...")
+    vectorizer = CountVectorizer(max_features=5000)
+    X = vectorizer.fit_transform(df['text_cleaned'])
+    
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, df['label'], test_size=0.25, random_state=42, stratify=df['label']
+    )
+    
+    print(f"Training set: {len(X_train)} emails")
+    print(f"Testing set: {len(X_test)} emails")
+    print()
+    
+    print("Training model...")
+    classifier = MultinomialNB()
+    classifier.fit(X_train, y_train)
+    
+    y_pred = classifier.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"
+Model Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)")
+    print("
+Classification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    joblib.dump(classifier, 'email_spam_model.pkl')
+    joblib.dump(vectorizer, 'vectorizer.pkl')
+    print("
+Model saved as 'email_spam_model.pkl'")
+    print("Vectorizer saved as 'vectorizer.pkl'")
+    
+    return classifier, vectorizer
+
+def predict_email(email_text, classifier, vectorizer):
+    """Predict if a single email is spam or not"""
+    cleaned_text = preprocess_text(email_text)
+    vectorized_text = vectorizer.transform([cleaned_text])
+    prediction = classifier.predict(vectorized_text)[0]
+    return prediction
+
+def main():
+    """Main function to run the spam detector"""
+    
+    classifier, vectorizer = train_spam_detector()
+    
+    print("
+" + "=" * 60)
+    print("TESTING PREDICTIONS")
+    print("=" * 60)
+    
+    test_emails = [
+        "Congratulations You won 1000 cash Click now to claim your prize",
+        "Hi can we schedule a meeting for tomorrow at 3pm",
+        "FREE MONEY Urgent Click this link now before it expires",
+        "The quarterly report is attached Please review before Friday",
+        "WINNER Get free iPhone click link urgent money now",
+        "Thanks for sending the documents I will review them today"
+    ]
+    
+    for i, email in enumerate(test_emails, 1):
+        prediction = predict_email(email, classifier, vectorizer)
+        status = "⚠️ SPAM" if prediction == 'spam' else "✓ OK"
+        print(f"
+Email {i}: {status}")
+        print(f"Text: {email}")
+    
+    print("
+" + "=" * 60)
+    print("PROGRAM COMPLETE - Model ready to use!")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    main()
